@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+    <head>
+        <title>remote-cc</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%;}
+            #remote_screen { border: 1px solid #000000; }
+        </style>
+    </head>
+    <body>
+        <canvas id="remote_screen"></canvas>
+        <script src="./lib/whatstr-for-pyautogui.js"></script>
+        <script src="./lib/jquery-3.1.0.slim.min.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            var socket = io();
+            var rscr = document.getElementById("remote_screen");
+            var ctx = rscr.getContext("2d");
+            var img = new Image();
+            var isResize = true;
+            var viewWidth, viewHeight;
+
+            // resize the canvas with the window
+            window.onresize = function(){
+                isResize = true;
+            };
+
+            // on new frame
+            img.onload = function () {
+                if (isResize){
+                    // resize the canvas with the window
+                    viewWidth = window.innerWidth;
+                    viewHeight = window.innerWidth * img.height / img.width;
+                    rscr.width = viewWidth;
+                    rscr.height = viewHeight;
+                    isResize = false;
+                }
+                // display the new frame
+                ctx.drawImage(img, 0, 0, viewWidth, viewHeight);
+            };
+            socket.on('new_frame', function(path){
+                // update frame
+                img.src = path;
+            });
+
+            // on mouse move
+            rscr.onmousemove = function(e){
+                var x = e.pageX - $(this).offset().left;
+                var y = e.pageY - $(this).offset().top;
+                var win_width = $('#remote_screen').width();
+                socket.emit('mouse_move', { action: 'mouse_move', position: { 'x':x, 'y':y }, width: win_width });
+            }
+
+            // on left click
+            rscr.onclick = function(e){
+                var x = e.pageX - $(this).offset().left;
+                var y = e.pageY - $(this).offset().top;
+                var win_width = rscr.width;
+                socket.emit('mouse_click', { action: 'mouse_click', position: { 'x':x, 'y':y }, width: win_width });
+                return false;
+            }
+
+            // on right click
+            rscr.oncontextmenu = function(e){
+                var x = e.pageX - $(this).offset().left;
+                var y = e.pageY - $(this).offset().top;
+                var win_width = rscr.width;
+                socket.emit('mouse_click', { action: 'mouse_right_click', position: { 'x':x, 'y':y }, width: win_width });
+                return false;
+            }
+
+            // on double click
+            rscr.ondblclick = function(e){
+                var x = e.pageX - $(this).offset().left;
+                var y = e.pageY - $(this).offset().top;
+                var win_width = rscr.width;
+                socket.emit('mouse_click', { action: 'mouse_double_click', position: { 'x':x, 'y':y }, width: win_width });
+                return false;
+            }
+
+            // on scroll
+            var oldposition = 0;
+            rscr.onscroll = function(){
+                var position = window.pageYOffset | document.body.scrollTop;
+                if (position >  oldposition){
+                    console.log("=> scroll down");
+                } else {
+                    console.log("=> scroll up");
+                }
+            }
+
+            // on text input
+            whatstr.onTextInput (function(char){
+                if ($("#remote_screen:focus")){
+                    socket.emit('text_input', { action: 'text_input', text: char});
+                }
+            });
+
+            // on command input
+            whatstr.onCmdInput (function(cmd){
+                if ($("#remote_screen:focus")){
+                    socket.emit('command_input', { action: 'command_input', cmd: cmd});
+                }
+            });
+        </script>
+    </body>
+</html>
